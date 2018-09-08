@@ -1,0 +1,18 @@
+schema: "1"        
+id: k8stemplate-wait-template
+metadata:
+  name: Simple wait template
+  description: Simple wait pipeline
+  owner: stevenkim@google.com
+  scopes:
+    - global
+variables:         
+- name: waitTime
+  description: The time a wait stage should pause (secs)
+  type: int
+stages:
+- id: wait1
+  type: wait
+  config:
+    waitTime: "{{ waitTime }}"  # Variables can be used anywhere
+
