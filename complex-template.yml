@@ -1,0 +1,164 @@
+schema: 1
+id: k8stemplate-complex
+metadata:
+  name: Complex pipeline template
+  description: Staged multi-region deployment template
+  owner: stevenkim@google.com
+  scopes:
+    - global
+variables: []
+configuration:
+  expectedArtifacts:
+  - id: c20702f7-e003-4a26-b158-dba746272d74
+    defaultArtifact:
+      kind: custom
+    matchArtifact:
+      kind: docker
+      name: gcr.io/spinnaker-1022/k8scomplex:release
+      type: docker/image
+    useDefaultArtifact: false
+    usePriorExecution: false
+  - id: d3b2014d-d35b-401b-8d1c-bc75506b7f5b
+    defaultArtifact:
+      kind: custom
+    matchArtifact:
+      kind: github
+      name: k8scomplex-rs-stage.yml
+      type: github/file
+    useDefaultArtifact: false
+    usePriorExecution: false
+  - id: caf12618-8b8b-4973-9c83-42a75d5075e4
+    defaultArtifact: 
+      kind: custom
+    matchArtifact: 
+      kind: github
+      name: k8scomplex-rs-prod-region1.yml
+      type: github/file
+    useDefaultArtifact: false
+    usePriorExecution: false
+  - id: e339a243-2e91-4b70-b1c8-58558c77bf53
+    defaultArtifact:
+      kind: custom
+    matchArtifact:
+      kind: github
+      name: k8scomplex-rs-prod-region2.yml
+      type: github/file
+    useDefaultArtifact: false
+    usePriorExecution: false
+  triggers:
+  - type: pubsub
+    attributeConstraints: 
+    enabled: true
+    expectedArtifactIds:
+    - c20702f7-e003-4a26-b158-dba746272d74
+    payloadConstraints: 
+      status: SUCCESS
+    pubsubSystem: google
+    runAsUser: mdservice-sa
+    subscriptionName: my-k8scomplex-pubsub
+stages:
+- id: deploy-to-stage
+  type: deployManifest
+  config:
+    account: k8s-region1
+    cloudProvider: kubernetes
+    manifestArtifactAccount: my-github-artifact-account
+    manifestArtifactId: d3b2014d-d35b-401b-8d1c-bc75506b7f5b
+    moniker:
+      app: k8scomplex
+    name: Deploy Stage
+    refId: 1
+    relationships:
+      loadBalancers: []
+      securityGroups: []
+    requiredArtifactIds:
+    - c20702f7-e003-4a26-b158-dba746272d74
+    requisiteStageRefIds: []
+    source: artifact
+- id: run-release-test
+  type: runJob
+  config:
+    account: my-k8s-account
+    annotations: 
+    application: k8scomplex
+    cloudProvider: kubernetes
+    cloudProviderType: kubernetes
+    containers:
+    - args: []
+      command: []
+      envFrom: []
+      envVars:
+      - name: ENDPOINT
+        value: 104.197.218.44
+      imageDescription: 
+        account: my-gcr-account
+        imageId: gcr.io/spinnaker-1022/test-job:0.8
+        registry: gcr.io
+        repository: spinnaker-1022/test-job
+        tag: 0.8
+      imagePullPolicy: IFNOTPRESENT
+      limits: 
+      name: spinnaker-1022-test-job
+      ports:
+      - containerPort: 80
+        name: http
+        protocol: TCP
+      requests: 
+      volumeMounts: []
+    dnsPolicy: ClusterFirst
+    labels: 
+    name: Run Release Test
+    namespace: integration-testing
+    nodeSelector: 
+    refId: 6
+    requisiteStageRefIds:
+    - 1
+- id: manual-judgment
+  type: manualJudgment
+  config:
+    failPipeline: true
+    judgmentInputs: []
+    name: Manual Judgment
+    notifications: []
+    refId: 2
+    requisiteStageRefIds:
+    - 6
+- id: deploy-region1 
+  type: deployManifest
+  config:
+    account: k8s-region1
+    cloudProvider: kubernetes
+    manifestArtifactAccount: my-github-artifact-account
+    manifestArtifactId: caf12618-8b8b-4973-9c83-42a75d5075e4
+    moniker: 
+      app: k8scomplex
+    name: Roll Out Region 1
+    refId: 3
+    relationships: 
+      loadBalancers: []
+      securityGroups: []
+    requiredArtifactIds:
+    - c20702f7-e003-4a26-b158-dba746272d74
+    requisiteStageRefIds:
+    - 2
+    source: artifact
+- id: deploy-region2
+  type: deployManifest
+  config:
+    account: k8s-region2
+    cloudProvider: kubernetes
+    manifestArtifactAccount: my-github-artifact-account
+    manifestArtifactId: e339a243-2e91-4b70-b1c8-58558c77bf53
+    moniker: 
+      app: k8scomplex
+    name: Roll Out Region 2
+    refId: 4
+    relationships: 
+      loadBalancers: []
+      securityGroups: []
+    requiredArtifactIds:
+    - c20702f7-e003-4a26-b158-dba746272d74
+    requisiteStageRefIds:
+    - 2
+    source: artifact
+
