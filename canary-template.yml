@@ -1,0 +1,135 @@
+schema: 1
+id: k8stemplate-canary
+metadata:
+  name: Canary pipeline template
+  description: Production deployment via canary analysis
+  owner: stevenkim@google.com
+  scopes:
+    - global
+variables: []
+configuration:
+  expectedArtifacts:
+  - id: 036d1f9b-09f1-4718-9f28-5d26ae1565b7
+    defaultArtifact: 
+      kind: custom
+    matchArtifact: 
+      kind: docker
+      name: gcr.io/spinnaker-1022/k8scanary
+      type: docker/image
+    useDefaultArtifact: false
+    usePriorArtifact: true
+    usePriorExecution: false
+  - id: d4c8b179-ff26-4367-8527-1915701d5f30
+    defaultArtifact: 
+      kind: default.github
+      name: k8s-deployment.yml
+      reference: https://api.github.com/repos/skim1420/k8scanary/contents/k8s-deployment.yml
+      type: github/file
+      version: master
+    matchArtifact: 
+      kind: github
+      name: k8s-deployment.yml
+      type: github/file
+    useDefaultArtifact: true
+    usePriorExecution: false
+  - id: 686323ec-345d-4834-b775-0b5ee7f417f8
+    defaultArtifact: 
+      kind: default.github
+      name: k8s-deployment-canary.yml
+      reference: https://api.github.com/repos/skim1420/k8scanary/contents/k8s-deployment-canary.yml
+      type: github/file
+    matchArtifact: 
+      kind: github
+      name: k8s-deployment-canary.yml
+      type: github/file
+    useDefaultArtifact: true
+    usePriorExecution: false
+  triggers:
+  - attributeConstraints: 
+    enabled: true
+    expectedArtifactIds:
+    - 036d1f9b-09f1-4718-9f28-5d26ae1565b7
+    payloadConstraints: 
+      action: INSERT
+    pubsubSystem: google
+    subscriptionName: my-gcr-pubsub
+    type: pubsub
+stages:
+- id: deploy-canary
+  type: deployManifest
+  config:
+    account: k8s-region2
+    cloudProvider: kubernetes
+    manifestArtifactAccount: my-github-artifact-account
+    manifestArtifactId: 686323ec-345d-4834-b775-0b5ee7f417f8
+    moniker: 
+      app: k8scanary
+    name: Deploy Canary
+    refId: 1
+    relationships: 
+      loadBalancers: []
+      securityGroups: []
+    requiredArtifactIds:
+    - 036d1f9b-09f1-4718-9f28-5d26ae1565b7
+    requisiteStageRefIds: []
+    source: artifact
+- id: canary-analysis
+  type: kayentaCanary
+  config:
+    analysisType: realTime
+    canaryConfig: 
+      canaryAnalysisIntervalMins: 10
+      canaryConfigId: 14b96cce-d7ac-44da-bda1-83c372c78d73
+      combinedCanaryResultStrategy: LOWEST
+      lifetimeDuration: PT0H30M
+      metricsAccountName: my-google-account
+      scopes:
+      - controlLocation: k8scanary
+        controlScope: prod
+        experimentLocation: k8scanary
+        experimentScope: canary
+        extendedScopeParams: 
+          resourceType: k8s_container
+        scopeName: default
+        step: 60
+      scoreThresholds: 
+        marginal: 50
+        pass: 75
+      storageAccountName: my-google-account
+    name: Canary Analysis
+    refId: 2
+    requisiteStageRefIds:
+    - 1
+- id: update-prod
+  type: deployManifest
+  config:
+    account: k8s-region2
+    cloudProvider: kubernetes
+    manifestArtifactAccount: my-github-artifact-account
+    manifestArtifactId: d4c8b179-ff26-4367-8527-1915701d5f30
+    moniker: 
+      app: k8scanary
+    name: Update Prod
+    refId: 3
+    relationships: 
+      loadBalancers: []
+      securityGroups: []
+    requiredArtifactIds:
+    - 036d1f9b-09f1-4718-9f28-5d26ae1565b7
+    requisiteStageRefIds:
+    - 2
+    source: artifact
+- id: destroy-canary
+  type: deleteManifest
+  config:
+    account: k8s-region2
+    cloudProvider: kubernetes
+    kinds: []
+    location: k8scanary
+    manifestName: deployment canary
+    name: Tear Down Canary
+    options: 
+      cascading: true
+    refId: 4
+    requisiteStageRefIds:
+    - 2
