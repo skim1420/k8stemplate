@@ -6,7 +6,10 @@ metadata:
   owner: stevenkim@google.com
   scopes:
     - global
-variables: []
+variables:
+- name: oncallEmail
+  description: On-Call Email
+  type: string
 configuration:
   expectedArtifacts:
   - id: c20702f7-e003-4a26-b158-dba746272d74
@@ -119,7 +122,14 @@ stages:
     failPipeline: true
     judgmentInputs: []
     name: Manual Judgment
-    notifications: []
+    notifications:
+    - address: "{{ oncallEmail }}"
+      level: stage
+      type: email
+      when:
+      - manualJudgment
+      - manualJudgmentContinue
+      - manualJudgmentStop
     refId: 2
     requisiteStageRefIds:
     - 6
